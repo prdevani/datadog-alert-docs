@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datadog Alert Documentation Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">
+                        <i class="fas fa-file-alt"></i>
+                        <h1>Datadog Alert Docs</h1>
+                    </div>
+                    <nav class="nav">
+                        <button class="nav-btn active" data-tab="dashboard">
+                            <i class="fas fa-tachometer-alt"></i>
+                            Dashboard
+                        </button>
+                        <button class="nav-btn" data-tab="templates">
+                            <i class="fas fa-file-code"></i>
+                            Templates
+                        </button>
+                        <button class="nav-btn" data-tab="documents">
+                            <i class="fas fa-folder-open"></i>
+                            Documents
+                        </button>
+                        <button class="nav-btn" data-tab="alerts">
+                            <i class="fas fa-bell"></i>
+                            Pending Alerts
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <div class="container">
+                <!-- Dashboard Tab -->
+                <div id="dashboard" class="tab-content active">
+                    <div class="dashboard-header">
+                        <h2>Dashboard</h2>
+                        <p>Monitor your Datadog alert documentation system</p>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-bell"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="pending-alerts-count">0</h3>
+                                <p>Pending Alerts</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-file-code"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="templates-count">0</h3>
+                                <p>Templates</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-folder-open"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="documents-count">0</h3>
+                                <p>Documents</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-link"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3>Active</h3>
+                                <p>Webhook Status</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-sections">
+                        <div class="section">
+                            <h3>Recent Documents</h3>
+                            <div id="recent-documents" class="document-list">
+                                <div class="loading">Loading recent documents...</div>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <h3>Webhook Information</h3>
+                            <div class="webhook-info">
+                                <div class="info-item">
+                                    <label>Webhook URL:</label>
+                                    <div class="webhook-url">
+                                        <code id="webhook-url">http://localhost:3000/api/webhook/datadog</code>
+                                        <button class="copy-btn" onclick="copyWebhookUrl()">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="info-item">
+                                    <label>Method:</label>
+                                    <code>POST</code>
+                                </div>
+                                <div class="info-item">
+                                    <label>Content-Type:</label>
+                                    <code>application/json</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Templates Tab -->
+                <div id="templates" class="tab-content">
+                    <div class="tab-header">
+                        <h2>Templates</h2>
+                        <div class="tab-actions">
+                            <button class="btn btn-primary" onclick="showCreateTemplateModal()">
+                                <i class="fas fa-plus"></i>
+                                Create Template
+                            </button>
+                            <button class="btn btn-secondary" onclick="showUploadTemplateModal()">
+                                <i class="fas fa-upload"></i>
+                                Upload Template
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <input type="text" id="template-search" placeholder="Search templates..." class="search-input">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+
+                    <div id="templates-list" class="templates-grid">
+                        <div class="loading">Loading templates...</div>
+                    </div>
+                </div>
+
+                <!-- Documents Tab -->
+                <div id="documents" class="tab-content">
+                    <div class="tab-header">
+                        <h2>Generated Documents</h2>
+                        <div class="tab-actions">
+                            <select id="document-filter" class="filter-select">
+                                <option value="">All Documents</option>
+                                <option value="high">High Priority</option>
+                                <option value="medium">Medium Priority</option>
+                                <option value="low">Low Priority</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <input type="text" id="document-search" placeholder="Search documents..." class="search-input">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+
+                    <div id="documents-list" class="documents-grid">
+                        <div class="loading">Loading documents...</div>
+                    </div>
+                </div>
+
+                <!-- Pending Alerts Tab -->
+                <div id="alerts" class="tab-content">
+                    <div class="tab-header">
+                        <h2>Pending Alerts</h2>
+                        <div class="tab-actions">
+                            <button class="btn btn-secondary" onclick="refreshPendingAlerts()">
+                                <i class="fas fa-sync-alt"></i>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="pending-alerts-list" class="alerts-list">
+                        <div class="loading">Loading pending alerts...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Create Template Modal -->
+    <div id="create-template-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Template</h3>
+                <button class="modal-close" onclick="closeModal('create-template-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="create-template-form">
+                <div class="form-group">
+                    <label for="template-name">Template Name *</label>
+                    <input type="text" id="template-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="template-description">Description</label>
+                    <textarea id="template-description" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="template-category">Category</label>
+                    <select id="template-category" name="category">
+                        <option value="general">General</option>
+                        <option value="infrastructure">Infrastructure</option>
+                        <option value="application">Application</option>
+                        <option value="security">Security</option>
+                        <option value="performance">Performance</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="template-content">Template Content *</label>
+                    <textarea id="template-content" name="content" rows="15" required placeholder="Enter your Handlebars template here...
+
+Example:
+# Alert: {{alert.title}}
+
+**Type:** {{alert.type}}
+**Priority:** {{alert.priority}}
+**Time:** {{time.formatted}}
+
+## Details
+{{alert.message}}
+
+{{#if host.name}}
+**Host:** {{host.name}}
+{{/if}}
+
+{{#if metric.name}}
+**Metric:** {{metric.name}} = {{metric.value}}
+{{/if}}
+
+---
+Generated by {{generated.by}} at {{generated.formatted}}"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('create-template-modal')">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Create Template
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Upload Template Modal -->
+    <div id="upload-template-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Upload Template</h3>
+                <button class="modal-close" onclick="closeModal('upload-template-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="upload-template-form" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="upload-template-name">Template Name *</label>
+                    <input type="text" id="upload-template-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="upload-template-description">Description</label>
+                    <textarea id="upload-template-description" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="upload-template-category">Category</label>
+                    <select id="upload-template-category" name="category">
+                        <option value="general">General</option>
+                        <option value="infrastructure">Infrastructure</option>
+                        <option value="application">Application</option>
+                        <option value="security">Security</option>
+                        <option value="performance">Performance</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="template-file">Template File *</label>
+                    <div class="file-upload">
+                        <input type="file" id="template-file" name="template" accept=".txt,.hbs,.handlebars,.html,.md,.json,.template" required>
+                        <div class="file-upload-text">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span>Choose file or drag and drop</span>
+                            <small>Supported formats: .txt, .hbs, .handlebars, .html, .md, .json, .template</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('upload-template-modal')">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Upload Template
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Process Alert Modal -->
+    <div id="process-alert-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Process Alert</h3>
+                <button class="modal-close" onclick="closeModal('process-alert-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="process-alert-content">
+                <!-- Content will be populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
