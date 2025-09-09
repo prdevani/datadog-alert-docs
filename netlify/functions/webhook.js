@@ -21,14 +21,17 @@ let pendingAlerts = [];
 // Function to generate a consistent hash for deduplication
 function generateAlertHash(alert) {
   const crypto = require('crypto');
-  // Create hash based on key alert properties
+  // Create hash based on key alert properties, but be more flexible
   const hashData = {
     alert_type: alert.alert_type,
-    title: alert.title,
-    date: alert.date,
-    org: alert.org,
-    id: alert.id // Datadog's internal alert ID if available
+    title: alert.title || alert.event_title || 'untitled',
+    // Use timestamp with minute precision to allow new alerts but prevent rapid duplicates
+    timeWindow: Math.floor(Date.now() / (1000 * 60 * 5)) // 5-minute windows
   };
+  
+  // Only include org and id if they exist
+  if (alert.org) hashData.org = alert.org;
+  if (alert.id) hashData.id = alert.id;
   
   const hashString = JSON.stringify(hashData, Object.keys(hashData).sort());
   return crypto.createHash('md5').update(hashString).digest('hex');
