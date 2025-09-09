@@ -59,12 +59,22 @@ router.post('/datadog', async (req, res) => {
         source: 'datadog_text'
       };
     } else if (req.body && typeof req.body === 'object') {
-      // JSON payload
-      alert = req.body;
-      if (!alert.alert_type) {
-        // If no alert_type, try to infer from other fields
-        alert.alert_type = alert.event_type || 'info';
-      }
+      // JSON payload - handle real Datadog webhook format
+      const payload = req.body;
+      
+      alert = {
+        alert_type: payload.event_type || payload.alert_type || 'info',
+        title: payload.title || payload.event_title || 'Datadog Alert',
+        message: payload.body || payload.message || JSON.stringify(payload),
+        id: payload.id,
+        date: payload.date,
+        last_updated: payload.last_updated,
+        org: payload.org,
+        priority: 'medium',
+        timestamp: timestamp,
+        source: 'datadog_json',
+        originalPayload: payload
+      };
     } else {
       return res.status(400).json({ 
         error: 'Invalid webhook payload',

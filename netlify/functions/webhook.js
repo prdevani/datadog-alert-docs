@@ -67,24 +67,21 @@ exports.handler = async (event, context) => {
       if (typeof event.body === 'string' && event.body.trim().startsWith('{')) {
         // Looks like JSON, try to parse it
         try {
-          const alertData = JSON.parse(event.body);
+          const payload = JSON.parse(event.body);
           
-          // Validate JSON webhook payload
-          if (!alertData || !alertData.alert_type) {
-            return {
-              statusCode: 400,
-              headers,
-              body: JSON.stringify({ 
-                error: 'Invalid webhook payload',
-                message: 'Missing required alert_type field'
-              })
-            };
-          }
-          
+          // Handle real Datadog webhook format
           alert = {
-            ...alertData,
+            alert_type: payload.event_type || payload.alert_type || 'info',
+            title: payload.title || payload.event_title || 'Datadog Alert',
+            message: payload.body || payload.message || JSON.stringify(payload),
+            id: payload.id,
+            date: payload.date,
+            last_updated: payload.last_updated,
+            org: payload.org,
+            priority: 'medium',
             timestamp: timestamp,
-            source: 'datadog_json'
+            source: 'datadog_json',
+            originalPayload: payload
           };
           
         } catch (jsonError) {
