@@ -11,6 +11,7 @@ async function ensureDir(dirPath) {
 }
 
 // Get data directory path (use /tmp for Netlify functions)
+// Force redeploy to ensure latest changes are active
 function getDataDir() {
   return '/tmp/data';
 }
