@@ -12,7 +12,7 @@ async function ensureDir(dirPath) {
 
 // Get data directory path (use /tmp for Netlify functions)
 function getDataDir() {
-  return process.env.NODE_ENV === 'production' ? '/tmp/data' : path.join(__dirname, '../../data');
+  return '/tmp/data';
 }
 
 // In-memory storage for pending alerts (will reset on function cold starts)
