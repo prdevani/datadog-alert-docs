@@ -60,22 +60,65 @@ exports.handler = async (event, context) => {
   try {
     if (event.httpMethod === 'POST' && endpoint === 'datadog') {
       // Handle Datadog webhook
-      const alertData = JSON.parse(event.body);
+      let alert;
+      const timestamp = new Date().toISOString();
       
-      // Validate webhook payload
-      if (!alertData || !alertData.alert_type) {
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({ 
-            error: 'Invalid webhook payload',
-            message: 'Missing required alert_type field'
-          })
+      try {
+        // Try to parse as JSON first
+        const alertData = JSON.parse(event.body);
+        
+        // Validate JSON webhook payload
+        if (!alertData || !alertData.alert_type) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ 
+              error: 'Invalid webhook payload',
+              message: 'Missing required alert_type field'
+            })
+          };
+        }
+        
+        alert = {
+          ...alertData,
+          timestamp: timestamp,
+          source: 'datadog_json'
         };
+        
+      } catch (jsonError) {
+        // If JSON parsing fails, treat as text payload (real Datadog format)
+        if (typeof event.body === 'string') {
+          // Text payload - parse the Datadog message format
+          const textPayload = event.body;
+          const isAlert = textPayload.includes('[Triggered]') || textPayload.includes('Anomaly Detected');
+          const isRecovery = textPayload.includes('Normalized') || textPayload.includes('Recovery');
+          
+          // Extract title from the first line
+          const lines = textPayload.split('\n');
+          const titleLine = lines[0] || 'Datadog Alert';
+          
+          alert = {
+            alert_type: isAlert ? 'error' : (isRecovery ? 'recovery' : 'info'),
+            title: titleLine.replace('[Triggered]', '').replace('[Recovery]', '').trim(),
+            message: textPayload,
+            priority: textPayload.toLowerCase().includes('anomaly') ? 'high' : 'medium',
+            timestamp: timestamp,
+            source: 'datadog_text'
+          };
+        } else {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ 
+              error: 'Invalid webhook payload',
+              message: 'Unable to parse payload as JSON or text'
+            })
+          };
+        }
       }
       
       // Generate hash for deduplication
-      const alertHash = generateAlertHash(alertData);
+      const alertHash = generateAlertHash(alert);
       
       // Check if we already have this alert (deduplication)
       const existingAlert = pendingAlerts.find(a => a.alertHash === alertHash);
@@ -93,15 +136,15 @@ exports.handler = async (event, context) => {
         };
       }
       
-      const alert = {
+      const finalAlert = {
         id: Date.now().toString(),
         alertHash,
-        ...alertData,
+        ...alert,
         received_at: new Date().toISOString(),
         status: 'pending'
       };
 
-      pendingAlerts.push(alert);
+      pendingAlerts.push(finalAlert);
 
       // Also save to file system
       const dataDir = getDataDir();
@@ -116,10 +159,10 @@ exports.handler = async (event, context) => {
         // File doesn't exist, start with empty array
       }
 
-      existingAlerts.push(alert);
+      existingAlerts.push(finalAlert);
       await fs.writeFile(alertsFile, JSON.stringify(existingAlerts, null, 2));
 
-      console.log(`✅ Alert ${alert.id} stored and awaiting template selection (hash: ${alertHash})`);
+      console.log(`✅ Alert ${finalAlert.id} stored and awaiting template selection (hash: ${alertHash})`);
 
       return {
         statusCode: 200,
@@ -127,7 +170,7 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({ 
           success: true, 
           message: 'Alert received successfully',
-          alertId: alert.id 
+          alertId: finalAlert.id 
         })
       };
     }

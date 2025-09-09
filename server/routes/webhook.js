@@ -33,16 +33,48 @@ function generateAlertHash(alert) {
 router.post('/datadog', async (req, res) => {
   try {
     console.log('📨 Received Datadog webhook:', JSON.stringify(req.body, null, 2));
+    console.log('📨 Content-Type:', req.get('Content-Type'));
+    console.log('📨 Raw body:', req.body);
     
-    const alert = req.body;
+    let alert;
     const timestamp = moment().toISOString();
     
-    // Validate webhook payload
-    if (!alert || !alert.alert_type) {
+    // Handle both JSON and text payloads from Datadog
+    if (typeof req.body === 'string') {
+      // Text payload - parse the Datadog message format
+      const textPayload = req.body;
+      const isAlert = textPayload.includes('[Triggered]') || textPayload.includes('Anomaly Detected');
+      const isRecovery = textPayload.includes('Normalized') || textPayload.includes('Recovery');
+      
+      // Extract title from the first line
+      const lines = textPayload.split('\n');
+      const titleLine = lines[0] || 'Datadog Alert';
+      
+      alert = {
+        alert_type: isAlert ? 'error' : (isRecovery ? 'recovery' : 'info'),
+        title: titleLine.replace('[Triggered]', '').replace('[Recovery]', '').trim(),
+        message: textPayload,
+        priority: textPayload.toLowerCase().includes('anomaly') ? 'high' : 'medium',
+        timestamp: timestamp,
+        source: 'datadog_text'
+      };
+    } else if (req.body && typeof req.body === 'object') {
+      // JSON payload
+      alert = req.body;
+      if (!alert.alert_type) {
+        // If no alert_type, try to infer from other fields
+        alert.alert_type = alert.event_type || 'info';
+      }
+    } else {
       return res.status(400).json({ 
         error: 'Invalid webhook payload',
-        message: 'Missing required alert_type field'
+        message: 'Payload must be JSON object or text string'
       });
+    }
+    
+    // Ensure we have at least a basic alert structure
+    if (!alert.title && !alert.message) {
+      alert.title = 'Datadog Alert';
     }
     
     // Generate hash for deduplication
