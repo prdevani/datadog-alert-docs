@@ -18,6 +18,22 @@ function getDataDir() {
 // In-memory storage for pending alerts (will reset on function cold starts)
 let pendingAlerts = [];
 
+// Function to generate a consistent hash for deduplication
+function generateAlertHash(alert) {
+  const crypto = require('crypto');
+  // Create hash based on key alert properties
+  const hashData = {
+    alert_type: alert.alert_type,
+    title: alert.title,
+    date: alert.date,
+    org: alert.org,
+    id: alert.id // Datadog's internal alert ID if available
+  };
+  
+  const hashString = JSON.stringify(hashData, Object.keys(hashData).sort());
+  return crypto.createHash('md5').update(hashString).digest('hex');
+}
+
 exports.handler = async (event, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -43,8 +59,40 @@ exports.handler = async (event, context) => {
       // Handle Datadog webhook
       const alertData = JSON.parse(event.body);
       
+      // Validate webhook payload
+      if (!alertData || !alertData.alert_type) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Invalid webhook payload',
+            message: 'Missing required alert_type field'
+          })
+        };
+      }
+      
+      // Generate hash for deduplication
+      const alertHash = generateAlertHash(alertData);
+      
+      // Check if we already have this alert (deduplication)
+      const existingAlert = pendingAlerts.find(a => a.alertHash === alertHash);
+      if (existingAlert) {
+        console.log(`🔄 Duplicate alert detected (hash: ${alertHash}), returning existing alert ID: ${existingAlert.id}`);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            success: true,
+            alertId: existingAlert.id,
+            message: 'Alert already received (duplicate detected)',
+            duplicate: true
+          })
+        };
+      }
+      
       const alert = {
         id: Date.now().toString(),
+        alertHash,
         ...alertData,
         received_at: new Date().toISOString(),
         status: 'pending'
@@ -67,6 +115,8 @@ exports.handler = async (event, context) => {
 
       existingAlerts.push(alert);
       await fs.writeFile(alertsFile, JSON.stringify(existingAlerts, null, 2));
+
+      console.log(`✅ Alert ${alert.id} stored and awaiting template selection (hash: ${alertHash})`);
 
       return {
         statusCode: 200,

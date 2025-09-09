@@ -10,13 +10,28 @@ const router = express.Router();
 // Store for pending alerts awaiting template selection
 const pendingAlerts = new Map();
 
+// Function to generate a consistent hash for deduplication
+function generateAlertHash(alert) {
+  const crypto = require('crypto');
+  // Create hash based on key alert properties
+  const hashData = {
+    alert_type: alert.alert_type,
+    title: alert.title,
+    date: alert.date,
+    org: alert.org,
+    id: alert.id // Datadog's internal alert ID if available
+  };
+  
+  const hashString = JSON.stringify(hashData, Object.keys(hashData).sort());
+  return crypto.createHash('md5').update(hashString).digest('hex');
+}
+
 // Datadog webhook endpoint
 router.post('/datadog', async (req, res) => {
   try {
     console.log('📨 Received Datadog webhook:', JSON.stringify(req.body, null, 2));
     
     const alert = req.body;
-    const alertId = uuidv4();
     const timestamp = moment().toISOString();
     
     // Validate webhook payload
@@ -27,10 +42,29 @@ router.post('/datadog', async (req, res) => {
       });
     }
     
+    // Generate hash for deduplication
+    const alertHash = generateAlertHash(alert);
+    
+    // Check if we already have this alert (deduplication)
+    const existingAlert = Array.from(pendingAlerts.values()).find(a => a.alertHash === alertHash);
+    if (existingAlert) {
+      console.log(`🔄 Duplicate alert detected (hash: ${alertHash}), returning existing alert ID: ${existingAlert.id}`);
+      return res.status(200).json({
+        success: true,
+        alertId: existingAlert.id,
+        message: 'Alert already received (duplicate detected)',
+        nextStep: 'Select a template to generate documentation',
+        duplicate: true
+      });
+    }
+    
+    const alertId = uuidv4();
+    
     // Store the alert data
     const alertData = {
       id: alertId,
       timestamp,
+      alertHash,
       originalPayload: alert,
       status: 'pending_template_selection',
       processedAt: null,
@@ -45,7 +79,7 @@ router.post('/datadog', async (req, res) => {
     // Store in memory for quick access
     pendingAlerts.set(alertId, alertData);
     
-    console.log(`✅ Alert ${alertId} stored and awaiting template selection`);
+    console.log(`✅ Alert ${alertId} stored and awaiting template selection (hash: ${alertHash})`);
     
     // Return success response to Datadog
     res.status(200).json({
